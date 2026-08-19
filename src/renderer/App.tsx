@@ -18,6 +18,7 @@ export default function App(): JSX.Element {
   const [status, setStatus] = useState('Protected overlay ready');
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [sources, setSources] = useState<CaptureSource[] | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
   const [isRecording, setRecording] = useState(false);
   const requestId = useRef<string | null>(null);
@@ -47,17 +48,25 @@ export default function App(): JSX.Element {
 
   const openCapture = useCallback(async () => {
     setStatus('Loading capture sources…');
+    setCaptureError(null);
     try {
       setSources(await window.assistantApi.capture.listSources());
       setStatus('Choose a screen or window for OCR.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Unable to list sources.');
+      const message = error instanceof Error ? error.message : 'Unable to list sources.';
+      setCaptureError(message);
+      setStatus('Capture permission is needed.');
     }
   }, []);
 
   const toggleMic = useCallback(async () => {
     if (recorder.current?.state === 'recording') {
       recorder.current.stop();
+      return;
+    }
+    if (!settings.hasApiKey) {
+      setStatus('Transcription in v1 uses your OpenAI-compatible API. Add an API key in Settings; local Whisper is a v2 feature.');
+      setSettingsOpen(true);
       return;
     }
     try {
@@ -84,7 +93,7 @@ export default function App(): JSX.Element {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Microphone access was denied.');
     }
-  }, []);
+  }, [settings.hasApiKey]);
 
   useEffect(() => window.assistantApi.ui.onAction((action) => {
     if (action === 'capture') void openCapture();
@@ -148,5 +157,6 @@ export default function App(): JSX.Element {
     <footer><span><span className="protected-dot" /> Protected · {status}</span><span>{settings.model || 'No model'} · ~{pendingTokens} tokens</span></footer>
     {isSettingsOpen && <SettingsPanel settings={settings} onClose={() => setSettingsOpen(false)} onSave={saveSettings} onTest={() => window.assistantApi.chat.test()} />}
     {sources && <SourcePicker sources={sources} busy={captureBusy} onSelect={(sourceId) => void selectSource(sourceId)} onClose={() => !captureBusy && setSources(null)} />}
+    {captureError && <div className="modal-backdrop" role="presentation"><section className="permission-panel" role="dialog" aria-modal="true" aria-label="Screen Recording permission required"><h2>Allow Screen Recording</h2><p>{captureError.replace(/^Error invoking remote method 'capture:list-sources': /, '')}</p><div className="settings-actions"><button className="secondary" onClick={() => setCaptureError(null)}>Cancel</button><button className="secondary" onClick={() => void openCapture()}>Retry</button><button onClick={() => void window.assistantApi.system.openScreenRecordingSettings()}>Open System Settings</button></div></section></div>}
   </main>;
 }

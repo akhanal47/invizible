@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, shell } from 'electron';
 import { IPC } from '../shared/ipc-contract';
 import type { ChatSendRequest, OverlayMoveRequest, TranscriptionRequest } from '../shared/ipc-contract';
 import type { ChatError } from '../shared/chat-types';
@@ -23,6 +23,9 @@ export function registerIpcHandlers(settingsStore: SettingsStore): void {
     nudge(request.direction, request.pixels);
   });
   ipcMain.handle(IPC.overlayClose, closeOverlay);
+  ipcMain.handle(IPC.systemOpenScreenRecordingSettings, () =>
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+  );
   ipcMain.handle(IPC.captureListSources, listSources);
   ipcMain.handle(IPC.captureGrabAndOcr, async (_event, sourceId: string) => {
     const startedAt = Date.now();

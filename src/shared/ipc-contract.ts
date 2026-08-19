@@ -12,6 +12,7 @@ export const IPC = {
   captureListSources: 'capture:list-sources',
   captureGrabAndOcr: 'capture:grab-and-ocr',
   sttTranscribe: 'stt:transcribe',
+  systemOpenScreenRecordingSettings: 'system:open-screen-recording-settings',
   uiAction: 'ui:action',
   overlayMove: 'overlay:move',
   overlayClose: 'overlay:close'
@@ -69,6 +70,9 @@ export interface AssistantApi {
   };
   stt: {
     transcribe(request: TranscriptionRequest): Promise<string>;
+  };
+  system: {
+    openScreenRecordingSettings(): Promise<void>;
   };
   ui: {
     onAction(listener: (action: UiAction) => void): () => void;

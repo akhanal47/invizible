@@ -36,6 +36,9 @@ const api: AssistantApi = {
   stt: {
     transcribe: (request: TranscriptionRequest) => ipcRenderer.invoke(IPC.sttTranscribe, request)
   },
+  system: {
+    openScreenRecordingSettings: () => ipcRenderer.invoke(IPC.systemOpenScreenRecordingSettings)
+  },
   ui: {
     onAction: (listener: (action: UiAction) => void) => {
       const wrapped = (_event: Electron.IpcRendererEvent, action: UiAction): void => listener(action);
