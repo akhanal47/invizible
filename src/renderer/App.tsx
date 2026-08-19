@@ -1,130 +1,152 @@
-import { type FormEvent, type JSX, useEffect, useState } from 'react';
+import { type JSX, useCallback, useEffect, useRef, useState } from 'react';
+import type { ChatMessage, PendingAttachment, StreamEvent } from '../shared/chat-types';
+import type { CaptureSource } from '../shared/ipc-contract';
 import type { SettingsUpdate, SettingsView } from '../shared/settings';
+import { ChatView } from './components/ChatView';
+import { InputBar } from './components/InputBar';
+import { SettingsPanel } from './components/SettingsPanel';
+import { SourcePicker } from './components/SourcePicker';
+import { assembleMessages, estimateTokens } from './lib/prompt';
 
-const emptySettings: SettingsView = {
-  baseUrl: '',
-  sttBaseUrl: null,
-  model: '',
-  sttModel: '',
-  reasoningEffort: 'none',
-  maxOutputTokens: 1_000,
-  contextBudgetTokens: 12_000,
-  systemPrompt: '',
-  baseUserPrompt: '',
-  debugLogging: false,
-  hasApiKey: false
-};
+const emptySettings: SettingsView = { baseUrl: '', sttBaseUrl: null, model: '', sttModel: '', reasoningEffort: 'none', maxOutputTokens: 1_000, contextBudgetTokens: 12_000, systemPrompt: '', baseUserPrompt: '', debugLogging: false, hasApiKey: false };
 
 export default function App(): JSX.Element {
   const [settings, setSettings] = useState<SettingsView>(emptySettings);
-  const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [status, setStatus] = useState('Protected overlay ready');
+  const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [sources, setSources] = useState<CaptureSource[] | null>(null);
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [isRecording, setRecording] = useState(false);
+  const requestId = useRef<string | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
 
-  useEffect(() => {
-    void window.assistantApi.settings
-      .get()
-      .then(setSettings)
-      .catch(() => setStatus('Unable to load settings.'));
+  const handleStream = useCallback((event: StreamEvent): void => {
+    if (event.requestId !== requestId.current) return;
+    if (event.type === 'delta') {
+      setMessages((previous) => previous.map((message, index) => index === previous.length - 1 ? { ...message, content: message.content + event.text } : message));
+    } else if (event.type === 'notice') {
+      setStatus(event.text);
+    } else if (event.type === 'done') {
+      requestId.current = null;
+      setStatus('Response complete.');
+    } else {
+      requestId.current = null;
+      setStatus(event.error.message);
+      setMessages((previous) => previous.filter((message, index) => index !== previous.length - 1 || message.content.length > 0));
+    }
   }, []);
 
-  async function saveSettings(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const apiKey = String(form.get('apiKey') ?? '');
-    const update: SettingsUpdate = {
-      baseUrl: String(form.get('baseUrl') ?? ''),
-      model: String(form.get('model') ?? ''),
-      systemPrompt: String(form.get('systemPrompt') ?? ''),
-      maxOutputTokens: Number(form.get('maxOutputTokens')),
-      contextBudgetTokens: Number(form.get('contextBudgetTokens')),
-      ...(apiKey === '' ? {} : { apiKey })
-    };
+  useEffect(() => {
+    void window.assistantApi.settings.get().then(setSettings).catch((error: unknown) => setStatus(error instanceof Error ? error.message : 'Unable to load settings.'));
+    return window.assistantApi.chat.onStream(handleStream);
+  }, [handleStream]);
+
+  const openCapture = useCallback(async () => {
+    setStatus('Loading capture sources…');
     try {
-      setSettings(await window.assistantApi.settings.set(update));
-      setSettingsOpen(false);
-      setStatus('Settings saved securely');
+      setSources(await window.assistantApi.capture.listSources());
+      setStatus('Choose a screen or window for OCR.');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Unable to save settings.');
+      setStatus(error instanceof Error ? error.message : 'Unable to list sources.');
+    }
+  }, []);
+
+  const toggleMic = useCallback(async () => {
+    if (recorder.current?.state === 'recording') {
+      recorder.current.stop();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const nextRecorder = new MediaRecorder(stream, MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? { mimeType: 'audio/webm;codecs=opus' } : undefined);
+      chunks.current = [];
+      nextRecorder.ondataavailable = (event) => chunks.current.push(event.data);
+      nextRecorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        setRecording(false);
+        const audio = new Blob(chunks.current, { type: nextRecorder.mimeType });
+        setStatus('Transcribing…');
+        void audio.arrayBuffer().then((buffer) => window.assistantApi.stt.transcribe({ audio: buffer, mimeType: audio.type })).then((text) => {
+          if (!text) return setStatus('No speech was detected.');
+          setInput((previous) => [previous.trim(), text].filter(Boolean).join(previous.trim() ? '\n' : ''));
+          setAttachments((previous) => [...previous, { id: crypto.randomUUID(), type: 'transcript', text }]);
+          setStatus('Transcript inserted. Press Enter when ready to send.');
+        }).catch((error: unknown) => setStatus(error instanceof Error ? error.message : 'Transcription failed.'));
+      };
+      recorder.current = nextRecorder;
+      nextRecorder.start();
+      setRecording(true);
+      setStatus('Recording… use the mic button or hotkey to stop.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Microphone access was denied.');
+    }
+  }, []);
+
+  useEffect(() => window.assistantApi.ui.onAction((action) => {
+    if (action === 'capture') void openCapture();
+    if (action === 'toggle-mic') void toggleMic();
+  }), [openCapture, toggleMic]);
+
+  useEffect(() => {
+    function onEscape(event: KeyboardEvent): void {
+      if (event.key !== 'Escape') return;
+      if (requestId.current) void window.assistantApi.chat.abort(requestId.current);
+      else if (sources) setSources(null);
+      else setSettingsOpen(false);
+    }
+    window.addEventListener('keydown', onEscape);
+    return () => window.removeEventListener('keydown', onEscape);
+  }, [sources]);
+
+  function send(): void {
+    if (requestId.current || (!input.trim() && attachments.length === 0)) return;
+    const id = crypto.randomUUID();
+    const userContent = input.trim() || 'Please review the attached context.';
+    const requestMessages = assembleMessages(settings, messages, userContent, attachments);
+    requestId.current = id;
+    setMessages((previous) => [...previous, { role: 'user', content: userContent }, { role: 'assistant', content: '' }]);
+    setInput('');
+    setAttachments([]);
+    setStatus('Streaming response…');
+    void window.assistantApi.chat.send({ requestId: id, messages: requestMessages }).catch((error: unknown) => {
+      if (requestId.current !== id) return;
+      requestId.current = null;
+      setStatus(error instanceof Error ? error.message : 'Unable to send chat request.');
+    });
+  }
+
+  async function selectSource(sourceId: string): Promise<void> {
+    setCaptureBusy(true);
+    try {
+      const result = await window.assistantApi.capture.grabAndOcr(sourceId);
+      if (!result.text) throw new Error('No readable text was found in that capture.');
+      setAttachments((previous) => [...previous, { id: crypto.randomUUID(), type: 'screen_text', text: result.text, imageWidth: result.imageWidth, imageHeight: result.imageHeight }]);
+      setStatus(`OCR added (${result.durationMs}ms).`);
+      setSources(null);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'OCR failed.');
+    } finally {
+      setCaptureBusy(false);
     }
   }
 
-  return (
-    <main className="overlay-shell">
-      <header className="titlebar">
-        <span className="drag-region">Invisible AI</span>
-        <div className="window-actions">
-          <button aria-label="Open settings" className="icon-button" onClick={() => setSettingsOpen(true)}>
-            ⚙
-          </button>
-          <button aria-label="Close application" className="icon-button close-button" onClick={() => void window.assistantApi.overlay.close()}>
-            ×
-          </button>
-        </div>
-      </header>
+  async function saveSettings(update: SettingsUpdate): Promise<void> {
+    setSettings(await window.assistantApi.settings.set(update));
+    setStatus('Settings saved securely.');
+  }
 
-      <section className="chat-empty-state">
-        <div className="protected-mark">◈</div>
-        <h1>Your private AI overlay</h1>
-        <p>Configure your OpenAI-compatible API, then enter a prompt. Nothing is sent automatically.</p>
-      </section>
-
-      <section className="input-area">
-        <textarea aria-label="Message" placeholder="Type a prompt…" rows={3} disabled />
-        <div className="input-actions">
-          <span>Chat unlocks after the streaming client is connected.</span>
-          <button disabled>Send</button>
-        </div>
-      </section>
-
-      <footer>
-        <span className="protected-dot" /> Protected · {status}
-        <span>{settings.model || 'No model selected'}</span>
-      </footer>
-
-      {isSettingsOpen && (
-        <div className="modal-backdrop" role="presentation">
-          <form className="settings-panel" onSubmit={saveSettings}>
-            <div className="settings-heading">
-              <h2>Connection settings</h2>
-              <button type="button" className="icon-button" onClick={() => setSettingsOpen(false)}>
-                ×
-              </button>
-            </div>
-            <label>
-              API base URL
-              <input name="baseUrl" type="url" required defaultValue={settings.baseUrl} />
-            </label>
-            <label>
-              API key {settings.hasApiKey ? <small>(saved)</small> : null}
-              <input name="apiKey" type="password" autoComplete="new-password" placeholder="Leave blank to keep current key" />
-            </label>
-            <label>
-              Model
-              <input name="model" required defaultValue={settings.model} placeholder="gpt-4o-mini" />
-            </label>
-            <div className="setting-grid">
-              <label>
-                Max output tokens
-                <input name="maxOutputTokens" type="number" min="1" defaultValue={settings.maxOutputTokens} />
-              </label>
-              <label>
-                Context budget
-                <input name="contextBudgetTokens" type="number" min="1" defaultValue={settings.contextBudgetTokens} />
-              </label>
-            </div>
-            <label>
-              System prompt
-              <textarea name="systemPrompt" rows={4} defaultValue={settings.systemPrompt} />
-            </label>
-            <div className="settings-actions">
-              <button type="button" className="secondary" onClick={() => setSettingsOpen(false)}>
-                Cancel
-              </button>
-              <button type="submit">Save settings</button>
-            </div>
-          </form>
-        </div>
-      )}
-    </main>
-  );
+  const isStreaming = requestId.current !== null;
+  const pendingTokens = estimateTokens(assembleMessages(settings, [], input, attachments));
+  return <main className="overlay-shell">
+    <header className="titlebar"><span className="drag-region">Invisible AI</span><div className="window-actions"><button aria-label="Open settings" className="icon-button" onClick={() => setSettingsOpen(true)}>⚙</button><button aria-label="Close application" className="icon-button close-button" onClick={() => void window.assistantApi.overlay.close()}>×</button></div></header>
+    <ChatView messages={messages} />
+    <InputBar value={input} attachments={attachments} isStreaming={isStreaming} isRecording={isRecording} onChange={setInput} onSend={send} onAbort={() => requestId.current && void window.assistantApi.chat.abort(requestId.current)} onCapture={() => void openCapture()} onMic={() => void toggleMic()} onRemoveAttachment={(id) => setAttachments((previous) => previous.filter((item) => item.id !== id))} />
+    <footer><span><span className="protected-dot" /> Protected · {status}</span><span>{settings.model || 'No model'} · ~{pendingTokens} tokens</span></footer>
+    {isSettingsOpen && <SettingsPanel settings={settings} onClose={() => setSettingsOpen(false)} onSave={saveSettings} onTest={() => window.assistantApi.chat.test()} />}
+    {sources && <SourcePicker sources={sources} busy={captureBusy} onSelect={(sourceId) => void selectSource(sourceId)} onClose={() => !captureBusy && setSources(null)} />}
+  </main>;
 }

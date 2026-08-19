@@ -1,6 +1,6 @@
 # Invisible AI Overlay Assistant
 
-Cross-platform Electron overlay for a private, user-controlled AI chat workflow. This repository currently implements the Phase 0 scaffold plus the protected-window and secure-settings foundations.
+Cross-platform Electron overlay for a private, user-controlled AI chat workflow. It streams to OpenAI-compatible `/chat/completions` APIs, can OCR a selected screen/window, and supports push-to-talk transcription via an OpenAI-compatible transcription endpoint.
 
 ## Prerequisites
 
@@ -11,7 +11,36 @@ npm install
 npm run dev
 ```
 
-Use `npm run build`, `npm run lint`, `npm run typecheck`, and `npm test` to verify the project.
+Use `pnpm run build`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm test` to verify the project.
+
+## Use
+
+1. Open **Settings** and enter an API base URL, model, and API key. The key is write-only and encrypted by Electron safeStorage.
+2. Type a message and press `Enter` to send it. Use `Shift+Enter` for a newline. The model response streams into the chat; `Esc` or **Stop** aborts it.
+3. Select **Capture** (or press the capture hotkey), choose a display/window, and wait for the OCR attachment chip. Remove a chip with its × button if needed.
+4. Select **Mic** (or press its hotkey) to start recording; use it again to stop. The transcript is placed in the input field and is never sent until you press `Enter`.
+
+The app never automatically sends typed text, OCR, or transcription.
+
+### Fixed hotkeys
+
+- `Cmd/Ctrl+Shift+Space` — show/hide overlay
+- `Cmd/Ctrl+Shift+S` — choose OCR capture source
+- `Cmd/Ctrl+Shift+M` — start/stop microphone recording
+- `Cmd/Ctrl+Shift+Arrow` — move overlay 40 px
+- `Esc` (in app) — stop response or close source picker
+
+On macOS, grant **Screen Recording** permission before capture and **Microphone** permission before dictation. If a screen capture is blank, grant Screen Recording in System Settings, then restart the app.
+
+## Packaging
+
+Create unsigned development artifacts with:
+
+```bash
+pnpm package
+```
+
+Artifacts are written to `release/` (`.dmg`/`.zip` on macOS; NSIS installer when packaged on Windows). Production distribution still requires your signing and notarization credentials.
 
 ## Security model
 

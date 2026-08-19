@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "package": "pnpm run build && electron-builder --publish never",
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,24 +18,41 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "5.2.0",
-    "electron": "43.4.0",
-    "electron-vite": "5.0.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "tesseract.js": "6.0.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@vitejs/plugin-react": "5.2.0",
     "@types/node": "26.2.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "eslint": "10.8.1",
     "eslint-config-prettier": "10.1.8",
+    "electron-builder": "26.8.0",
+    "electron": "43.4.0",
+    "electron-vite": "5.0.0",
     "globals": "17.11.0",
     "prettier": "3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.67.0",
     "vite": "7.1.10",
     "vitest": "4.1.10"
+  },
+  "build": {
+    "appId": "com.invisibleai.overlay",
+    "productName": "Invisible AI Overlay",
+    "directories": { "output": "release" },
+    "files": ["out/**/*", "package.json"],
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.productivity",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Invisible AI Overlay uses the microphone for push-to-talk transcription.",
+        "NSScreenCaptureUsageDescription": "Invisible AI Overlay captures a selected screen or window for OCR."
+      }
+    },
+    "win": { "target": ["nsis"] }
   }
 }

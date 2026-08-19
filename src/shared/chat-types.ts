@@ -5,6 +5,14 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface PendingAttachment {
+  id: string;
+  type: 'screen_text' | 'transcript';
+  text: string;
+  imageWidth?: number;
+  imageHeight?: number;
+}
+
 export type Attachment =
   | { type: 'screen_text'; text: string; imageWidth: number; imageHeight: number }
   | { type: 'transcript'; text: string };

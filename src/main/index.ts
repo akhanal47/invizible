@@ -1,8 +1,10 @@
 import { app, BrowserWindow, Menu } from 'electron';
 import { registerHotkeys, unregisterHotkeys } from './hotkeys';
 import { registerIpcHandlers } from './ipc-router';
+import { terminateOcr } from './ocr';
 import { SettingsStore } from './settings-store';
-import { createOverlayWindow } from './window';
+import { IPC } from '../shared/ipc-contract';
+import { createOverlayWindow, getWindow, nudge, toggleVisibility } from './window';
 
 const settingsStore = new SettingsStore();
 
@@ -14,12 +16,20 @@ async function start(): Promise<void> {
   await settingsStore.load();
   createOverlayWindow();
   registerIpcHandlers(settingsStore);
-  registerHotkeys();
+  registerHotkeys({
+    toggleVisibility,
+    nudge,
+    capture: () => getWindow().webContents.send(IPC.uiAction, 'capture'),
+    toggleMic: () => getWindow().webContents.send(IPC.uiAction, 'toggle-mic')
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createOverlayWindow();
   });
 }
 
-app.on('will-quit', unregisterHotkeys);
+app.on('will-quit', () => {
+  unregisterHotkeys();
+  void terminateOcr();
+});
 void start();
