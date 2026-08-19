@@ -1,20 +1,27 @@
 import { globalShortcut } from 'electron';
-import { nudge, toggleVisibility } from './window';
 
 export interface HotkeyStatus {
   accelerator: string;
   registered: boolean;
 }
 
-const hotkeys: Array<[string, () => void]> = [
-  ['CommandOrControl+Shift+Space', toggleVisibility],
-  ['CommandOrControl+Shift+Up', () => nudge('up')],
-  ['CommandOrControl+Shift+Down', () => nudge('down')],
-  ['CommandOrControl+Shift+Left', () => nudge('left')],
-  ['CommandOrControl+Shift+Right', () => nudge('right')]
-];
+export interface HotkeyActions {
+  toggleVisibility(): void;
+  nudge(direction: 'up' | 'down' | 'left' | 'right'): void;
+  capture(): void;
+  toggleMic(): void;
+}
 
-export function registerHotkeys(): HotkeyStatus[] {
+export function registerHotkeys(actions: HotkeyActions): HotkeyStatus[] {
+  const hotkeys: Array<[string, () => void]> = [
+    ['CommandOrControl+Shift+Space', actions.toggleVisibility],
+    ['CommandOrControl+Shift+S', actions.capture],
+    ['CommandOrControl+Shift+M', actions.toggleMic],
+    ['CommandOrControl+Shift+Up', () => actions.nudge('up')],
+    ['CommandOrControl+Shift+Down', () => actions.nudge('down')],
+    ['CommandOrControl+Shift+Left', () => actions.nudge('left')],
+    ['CommandOrControl+Shift+Right', () => actions.nudge('right')]
+  ];
   return hotkeys.map(([accelerator, callback]) => ({
     accelerator,
     registered: globalShortcut.register(accelerator, callback)
