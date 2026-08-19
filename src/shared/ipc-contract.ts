@@ -8,7 +8,8 @@ export const IPC = {
   chatSend: 'chat:send',
   chatAbort: 'chat:abort',
   chatStream: 'chat:stream',
-  overlayMove: 'overlay:move'
+  overlayMove: 'overlay:move',
+  overlayClose: 'overlay:close'
 } as const;
 
 export interface ChatSendRequest {
@@ -33,5 +34,6 @@ export interface AssistantApi {
   };
   overlay: {
     move(request: OverlayMoveRequest): Promise<void>;
+    close(): Promise<void>;
   };
 }

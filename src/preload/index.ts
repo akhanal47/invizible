@@ -18,7 +18,8 @@ const api: AssistantApi = {
     }
   },
   overlay: {
-    move: (request: OverlayMoveRequest) => ipcRenderer.invoke(IPC.overlayMove, request)
+    move: (request: OverlayMoveRequest) => ipcRenderer.invoke(IPC.overlayMove, request),
+    close: () => ipcRenderer.invoke(IPC.overlayClose)
   }
 };
 

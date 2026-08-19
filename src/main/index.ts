@@ -1,4 +1,4 @@
-import { app, Menu } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import { registerHotkeys, unregisterHotkeys } from './hotkeys';
 import { registerIpcHandlers } from './ipc-router';
 import { SettingsStore } from './settings-store';
@@ -9,7 +9,7 @@ const settingsStore = new SettingsStore();
 async function start(): Promise<void> {
   await app.whenReady();
   Menu.setApplicationMenu(null);
-  if (process.platform === 'darwin') app.dock.hide();
+  if (process.platform === 'darwin') app.dock?.hide();
 
   await settingsStore.load();
   createOverlayWindow();
@@ -17,7 +17,7 @@ async function start(): Promise<void> {
   registerHotkeys();
 
   app.on('activate', () => {
-    if (app.getAllWindows().length === 0) createOverlayWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createOverlayWindow();
   });
 }
 

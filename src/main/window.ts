@@ -1,4 +1,4 @@
-import { BrowserWindow, screen } from 'electron';
+import { app, BrowserWindow, screen } from 'electron';
 import { join } from 'node:path';
 
 let overlayWindow: BrowserWindow | null = null;
@@ -61,9 +61,15 @@ export function toggleVisibility(): void {
   window.focus();
 }
 
+export function closeOverlay(): void {
+  app.quit();
+}
+
 export function nudge(direction: 'up' | 'down' | 'left' | 'right', pixels = 40): void {
   const window = getWindow();
-  const [x, y] = window.getPosition();
+  const [savedX, savedY] = window.getPosition();
+  const x = savedX ?? 0;
+  const y = savedY ?? 0;
   const offsets: Record<'up' | 'down' | 'left' | 'right', [number, number]> = {
     up: [0, -pixels],
     down: [0, pixels],

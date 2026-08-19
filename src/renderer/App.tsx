@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, type JSX, useEffect, useState } from 'react';
 import type { SettingsUpdate, SettingsView } from '../shared/settings';
 
 const emptySettings: SettingsView = {
@@ -52,9 +52,14 @@ export default function App(): JSX.Element {
     <main className="overlay-shell">
       <header className="titlebar">
         <span className="drag-region">Invisible AI</span>
-        <button aria-label="Open settings" className="icon-button" onClick={() => setSettingsOpen(true)}>
-          ⚙
-        </button>
+        <div className="window-actions">
+          <button aria-label="Open settings" className="icon-button" onClick={() => setSettingsOpen(true)}>
+            ⚙
+          </button>
+          <button aria-label="Close application" className="icon-button close-button" onClick={() => void window.assistantApi.overlay.close()}>
+            ×
+          </button>
+        </div>
       </header>
 
       <section className="chat-empty-state">

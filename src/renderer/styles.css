@@ -11,10 +11,12 @@ button, input, textarea { font: inherit; }
 button { cursor: pointer; }
 
 .overlay-shell { display: flex; min-height: 100vh; flex-direction: column; background: linear-gradient(160deg, #17233a, #101827 56%); }
-.titlebar { display: flex; height: 44px; align-items: center; justify-content: space-between; padding: 0 12px 0 18px; border-bottom: 1px solid #2c3a52; }
-.drag-region { -webkit-app-region: drag; font-size: 13px; font-weight: 650; letter-spacing: .02em; }
+.titlebar { display: flex; height: 44px; align-items: center; justify-content: space-between; padding: 0 12px 0 18px; border-bottom: 1px solid #2c3a52; -webkit-app-region: drag; }
+.drag-region { font-size: 13px; font-weight: 650; letter-spacing: .02em; }
+.window-actions { display: flex; gap: 3px; -webkit-app-region: no-drag; }
 .icon-button { border: 0; border-radius: 8px; background: transparent; color: #aebed9; font-size: 20px; line-height: 1; padding: 5px 8px; }
 .icon-button:hover { background: #273750; color: white; }
+.close-button:hover { background: #ef4444; }
 .chat-empty-state { flex: 1; display: grid; place-content: center; padding: 42px; text-align: center; }
 .protected-mark { color: #7dd3fc; font-size: 45px; }
 h1 { margin: 12px 0 8px; font-size: 22px; }
