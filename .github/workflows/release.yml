@@ -1,0 +1,167 @@
+name: Release installers
+
+on:
+  # The target event also supports merged PRs from forks. Never build a PR head:
+  # only the commit already merged into develop is trusted for this workflow.
+  pull_request_target:
+    types: [closed]
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.run_id }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    if: >-
+      (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      tag: ${{ steps.metadata.outputs.tag }}
+      title: ${{ steps.metadata.outputs.title }}
+      commit: ${{ steps.metadata.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Choose release version and commit
+        id: metadata
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { execFileSync } = require('node:child_process');
+          const base = require('./package.json').version;
+          if (!/^\d+\.\d+\.\d+$/.test(base)) {
+            throw new Error('package.json version must have the form major.minor.patch');
+          }
+          const version = `${base}-build.${process.env.GITHUB_RUN_NUMBER}`;
+          const title = `Invizible-${new Date().toISOString().slice(0, 10)}`;
+          const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\ntag=v${version}\ntitle=${title}\ncommit=${commit}\n`);
+          NODE
+
+  build:
+    needs: prepare
+    name: Build ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: mac
+            arch: arm64
+            target: dmg
+          - runner: macos-15
+            platform: mac
+            arch: x64
+            target: dmg
+          - runner: windows-2025
+            platform: win
+            arch: x64
+            target: nsis
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Package installer
+        run: |
+          pnpm exec electron-builder --${{ matrix.platform }} ${{ matrix.target }} \
+            --${{ matrix.arch }} --publish never \
+            -c.extraMetadata.version="$RELEASE_VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            release/*.dmg
+            release/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+          overwrite: true
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Build jobs cannot publish. This job runs no repository code.
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      RELEASE_TITLE: ${{ needs.prepare.outputs.title }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          path: installers
+          merge-multiple: true
+      - name: Verify downloads and create checksums
+        working-directory: installers
+        run: |
+          test -s "Invizible-${RELEASE_VERSION}-mac-arm64.dmg"
+          test -s "Invizible-${RELEASE_VERSION}-mac-x64.dmg"
+          test -s "Invizible-${RELEASE_VERSION}-win-x64.exe"
+          sha256sum *.dmg *.exe > SHA256SUMS.txt
+      - name: Publish complete release
+        run: |
+          # A rerun resumes a draft but never replaces already published binaries.
+          if gh release view "$RELEASE_TAG" --json isDraft > release-state.json 2>/dev/null; then
+            if [ "$(jq -r .isDraft release-state.json)" = false ]; then
+              echo "Release $RELEASE_TAG is already published."
+              exit 0
+            fi
+          else
+            cat > release-notes.md <<'NOTES'
+          Download the installer for your computer:
+          - Apple Silicon Mac (M-series): `mac-arm64.dmg`
+          - Intel Mac: `mac-x64.dmg`
+          - Windows x64: `win-x64.exe` (NSIS installer)
+
+          On macOS, open the DMG and drag the app into Applications. On Windows, run the EXE installer. Node.js and pnpm are not needed to use the installed app.
+
+          These automated builds are not signed with a trusted publisher certificate or notarized by Apple. macOS Gatekeeper or Windows SmartScreen may warn or block opening them. Only proceed if you trust this repository. See the README for installation guidance. Configure your own provider credentials in Settings after installation.
+
+          SHA256SUMS.txt contains checksums for all three installers.
+          NOTES
+            gh release create "$RELEASE_TAG" --target "$RELEASE_COMMIT" \
+              --title "$RELEASE_TITLE" --draft \
+              --notes-file release-notes.md --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" installers/*.dmg installers/*.exe installers/SHA256SUMS.txt --clobber
+          gh release edit "$RELEASE_TAG" --draft=false

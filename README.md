@@ -4,11 +4,21 @@ Cross-platform Electron overlay for a private, user-controlled chat workflow. It
 
 ## Prerequisites
 
-Install a current Node.js LTS release (20 or newer), then run:
+To use the app, download an installer from [GitHub Releases](https://github.com/akhanal47/interview-ai/releases). No Node.js or package manager is required:
+
+- **Apple Silicon Mac (M-series):** download `mac-arm64.dmg`.
+- **Intel Mac:** download `mac-x64.dmg`.
+- **Windows x64:** download `win-x64.exe`, the Windows installer.
+
+On macOS, open the DMG and drag **Invizible Overlay** into Applications. On Windows, run the installer and launch the installed app. Configure your own provider credentials in Settings.
+
+Automated releases currently lack trusted code signing and Apple notarization. macOS Gatekeeper or Windows SmartScreen may warn or block launch. If you trust the download, macOS may offer **System Settings → Privacy & Security → Open Anyway** after an attempted launch; Windows may offer **More info → Run anyway**. Managed computers may prohibit these overrides. A warning-free distribution requires signing credentials and macOS notarization.
+
+For development, install Node.js 24 and the pnpm version declared in `package.json`, then run:
 
 ```bash
-npm install
-npm run dev
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
 Use `pnpm run build`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm test` to verify the project.
@@ -72,7 +82,19 @@ Create unsigned development artifacts with:
 pnpm package
 ```
 
-The artifacts are written to `release/` (`.dmg`/`.zip` on macOS; NSIS installer when packaged on Windows). If you want a prod distribution, they require your signing and notarization credentials.
+The artifacts are written to `release/` (`.dmg`/`.zip` on macOS; NSIS `.exe` installer when packaged on Windows) and are usigned so they will pop-up a warning during installation
+
+### Automated GH releases
+
+> Not the preferred method of running the app (Please clone the repo and use `pnpm` or `npm` commands instead)
+
+The releases are just for convinience 
+
+Release titles use `Invizible-YYYY-MM-DD`, for example `Invizible-2026-09-27`, based on the UTC build date
+
+These are not signed and pop-up a warning or even outright failure during installation are expected
+
+For trusted distribution, configure electron-builder code signing on both platforms and Apple notarization using repository secrets. See [electron-builder signing guidance](https://www.electron.build/docs/features/code-signing/), [Apple's instructions for opening downloaded apps](https://support.apple.com/en-us/102445), and [GitHub's workflow event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target).
 
 ## Security model
 
