@@ -32,14 +32,14 @@ jobs:
       title: ${{ steps.metadata.outputs.title }}
       commit: ${{ steps.metadata.outputs.commit }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
@@ -85,14 +85,14 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.prepare.outputs.commit }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Package installer
@@ -100,7 +100,7 @@ jobs:
           pnpm exec electron-builder --${{ matrix.platform }} ${{ matrix.target }} \
             --${{ matrix.arch }} --publish never \
             -c.extraMetadata.version="$RELEASE_VERSION"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: installer-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
@@ -126,7 +126,7 @@ jobs:
       RELEASE_TITLE: ${{ needs.prepare.outputs.title }}
       RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           pattern: installer-*
           path: installers
