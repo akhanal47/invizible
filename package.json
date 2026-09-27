@@ -20,19 +20,21 @@
   "dependencies": {
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "tesseract.js": "6.0.1"
+    "tesseract.js": "6.0.1",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@vitejs/plugin-react": "5.2.0",
     "@types/node": "26.2.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "43.4.0",
+    "electron-builder": "26.8.0",
+    "electron-vite": "5.0.0",
     "eslint": "10.8.1",
     "eslint-config-prettier": "10.1.8",
-    "electron-builder": "26.8.0",
-    "electron": "43.4.0",
-    "electron-vite": "5.0.0",
     "globals": "17.11.0",
     "prettier": "3.9.6",
     "typescript": "5.9.3",
@@ -43,16 +45,28 @@
   "build": {
     "appId": "com.invizible.overlay",
     "productName": "Invizible Overlay",
-    "directories": { "output": "release" },
-    "files": ["out/**/*", "package.json"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "category": "public.app-category.productivity",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Invizible Overlay uses the microphone for push-to-talk transcription.",
+        "NSMicrophoneUsageDescription": "Invizible Overlay uses the microphone for dictation and live transcription.",
         "NSScreenCaptureUsageDescription": "Invizible Overlay captures a selected screen or window for OCR."
       }
     },
-    "win": { "target": ["nsis"] }
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
   }
 }

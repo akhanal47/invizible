@@ -2,7 +2,9 @@ import { type JSX, useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, PendingAttachment, StreamEvent } from '../shared/chat-types';
 import type { CaptureSource } from '../shared/ipc-contract';
 import { DEFAULT_SETTINGS } from '../shared/settings';
-import { supportsTranscription } from '../shared/providers';
+import { isLocalEndpoint } from '../shared/providers';
+import { assembleMessages } from './lib/prompt';
+import { useVoiceInput } from './lib/useVoiceInput';
 import { Icon } from './components/Icon';
 import type { SettingsUpdate, SettingsView } from '../shared/settings';
 import { ChatView } from './components/ChatView';
@@ -22,10 +24,25 @@ export default function App(): JSX.Element {
   const [sources, setSources] = useState<CaptureSource[] | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
-  const [isRecording, setRecording] = useState(false);
+  const voice = useVoiceInput(
+    settings,
+    (text, sessionId) => {
+      setInput((previous) => [previous, text].filter(Boolean).join(' '));
+      setAttachments((previous) => {
+        const existing = previous.find((item) => item.id === sessionId);
+        return existing
+          ? previous.map((item) =>
+              item.id === sessionId ? { ...item, text: `${item.text} ${text}` } : item
+            )
+          : [...previous, { id: sessionId, type: 'transcript', text }];
+      });
+    },
+    setStatus,
+    () => setSettingsOpen(true)
+  );
+  const isRecording = voice.phase === 'listening';
+  const toggleMic = voice.toggle;
   const requestId = useRef<string | null>(null);
-  const recorder = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<Blob[]>([]);
 
   const handleStream = useCallback((event: StreamEvent): void => {
     if (event.requestId !== requestId.current) return;
@@ -76,66 +93,6 @@ export default function App(): JSX.Element {
     }
   }, []);
 
-  const toggleMic = useCallback(async () => {
-    if (recorder.current?.state === 'recording') {
-      recorder.current.stop();
-      return;
-    }
-    if (
-      (!settings.hasSttApiKey && !settings.hasApiKey) ||
-      !supportsTranscription(settings.sttBaseUrl ?? settings.baseUrl) ||
-      (settings.sttBaseUrl &&
-        settings.sttBaseUrl.replace(/\/+$/, '') !== settings.baseUrl.replace(/\/+$/, '') &&
-        !settings.hasSttApiKey)
-    ) {
-      setStatus('Set up a transcription endpoint and key in Settings → Voice input.');
-      setSettingsOpen(true);
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const nextRecorder = new MediaRecorder(
-        stream,
-        MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? { mimeType: 'audio/webm;codecs=opus' }
-          : undefined
-      );
-      chunks.current = [];
-      nextRecorder.ondataavailable = (event) => chunks.current.push(event.data);
-      nextRecorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
-        setRecording(false);
-        const audio = new Blob(chunks.current, { type: nextRecorder.mimeType });
-        setStatus('Transcribing…');
-        void audio
-          .arrayBuffer()
-          .then((buffer) =>
-            window.assistantApi.stt.transcribe({ audio: buffer, mimeType: audio.type })
-          )
-          .then((text) => {
-            if (!text) return setStatus('No speech was detected.');
-            setInput((previous) =>
-              [previous.trim(), text].filter(Boolean).join(previous.trim() ? '\n' : '')
-            );
-            setAttachments((previous) => [
-              ...previous,
-              { id: crypto.randomUUID(), type: 'transcript', text }
-            ]);
-            setStatus('Transcript inserted. Press Enter when ready to send.');
-          })
-          .catch((error: unknown) =>
-            setStatus(error instanceof Error ? error.message : 'Transcription failed.')
-          );
-      };
-      recorder.current = nextRecorder;
-      nextRecorder.start();
-      setRecording(true);
-      setStatus('Recording… use the mic button or hotkey to stop.');
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Microphone access was denied.');
-    }
-  }, [settings]);
-
   useEffect(
     () =>
       window.assistantApi.ui.onAction((action) => {
@@ -159,8 +116,9 @@ export default function App(): JSX.Element {
   }, [sources, captureBusy, captureError, isSettingsOpen]);
 
   function send(): void {
-    if (requestId.current || (!input.trim() && attachments.length === 0)) return;
-    if (!settings.hasApiKey) {
+    if (voice.phase !== 'idle' || requestId.current || (!input.trim() && attachments.length === 0))
+      return;
+    if (!settings.hasApiKey && !isLocalEndpoint(settings.baseUrl)) {
       setSettingsOpen(true);
       setStatus('Add your API key to start a conversation.');
       return;
@@ -228,9 +186,7 @@ export default function App(): JSX.Element {
           <span className="brand-mark">
             <Icon name="spark" size={20} />
           </span>
-          <span>
-            Invizible
-          </span>
+          <span>Invizible</span>
         </div>
         <div className="window-actions">
           <button
@@ -265,7 +221,9 @@ export default function App(): JSX.Element {
         value={input}
         attachments={attachments}
         isStreaming={isStreaming}
-        isRecording={isRecording}
+        voicePhase={voice.phase}
+        interimTranscript={voice.interim}
+        liveVoice={settings.sttProvider === 'deepgram'}
         onChange={setInput}
         onSend={send}
         onAbort={() => requestId.current && void window.assistantApi.chat.abort(requestId.current)}

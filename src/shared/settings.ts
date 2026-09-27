@@ -5,6 +5,9 @@ export interface Settings {
   sttBaseUrl: string | null;
   model: string;
   sttModel: string;
+  sttProvider: 'compatible' | 'deepgram';
+  liveSttModel: string;
+  liveSttLanguage: string;
   reasoningEffort: ReasoningEffort;
   maxOutputTokens: number;
   contextBudgetTokens: number;
@@ -29,6 +32,9 @@ export const DEFAULT_SETTINGS: Settings = {
   sttBaseUrl: null,
   model: 'gpt-6-luna',
   sttModel: 'whisper-1',
+  sttProvider: 'compatible',
+  liveSttModel: 'nova-3',
+  liveSttLanguage: 'en',
   reasoningEffort: 'none',
   maxOutputTokens: 1_000,
   contextBudgetTokens: 12_000,
@@ -45,6 +51,13 @@ function isPositiveInteger(value: number): boolean {
 
 export function validateSettingsUpdate(update: SettingsUpdate): string[] {
   const errors: string[] = [];
+  if (update.sttProvider !== undefined && !['compatible', 'deepgram'].includes(update.sttProvider))
+    errors.push('Voice provider is invalid.');
+  for (const key of ['liveSttModel', 'liveSttLanguage'] as const) {
+    if (update[key] !== undefined && (typeof update[key] !== 'string' || !update[key].trim()))
+      errors.push('Live transcription model and language are required.');
+  }
+
   if (update.baseUrl !== undefined) {
     try {
       const url = new URL(update.baseUrl);

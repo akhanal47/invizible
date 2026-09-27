@@ -9,6 +9,12 @@ export const IPC = {
   chatAbort: 'chat:abort',
   chatStream: 'chat:stream',
   chatTest: 'chat:test',
+  chatModels: 'chat:models',
+  sttStart: 'stt:start',
+  sttAudio: 'stt:audio',
+  sttStop: 'stt:stop',
+  sttCancel: 'stt:cancel',
+  sttStream: 'stt:stream',
   captureListSources: 'capture:list-sources',
   captureGrabAndOcr: 'capture:grab-and-ocr',
   sttTranscribe: 'stt:transcribe',
@@ -47,6 +53,12 @@ export interface TranscriptionRequest {
   mimeType: string;
 }
 
+export type LiveTranscriptionEvent = { sessionId: string } & (
+  | { type: 'transcript'; text: string; final: boolean }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
+);
+
 export type UiAction = 'capture' | 'toggle-mic';
 
 export interface AssistantApi {
@@ -58,6 +70,7 @@ export interface AssistantApi {
     send(request: ChatSendRequest): Promise<void>;
     abort(requestId: string): Promise<void>;
     test(): Promise<void>;
+    models(baseUrl: string, apiKey?: string): Promise<string[]>;
     onStream(listener: (event: StreamEvent) => void): () => void;
   };
   overlay: {
@@ -70,6 +83,11 @@ export interface AssistantApi {
   };
   stt: {
     transcribe(request: TranscriptionRequest): Promise<string>;
+    start(sessionId: string): Promise<void>;
+    audio(sessionId: string, audio: ArrayBuffer): Promise<void>;
+    stop(sessionId: string): Promise<void>;
+    cancel(sessionId: string): Promise<void>;
+    onStream(listener: (event: LiveTranscriptionEvent) => void): () => void;
   };
   system: {
     openScreenRecordingSettings(): Promise<void>;
