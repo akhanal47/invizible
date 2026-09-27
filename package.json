@@ -43,8 +43,9 @@
     "vitest": "4.1.10"
   },
   "build": {
-    "appId": "com.invizible.overlay",
-    "productName": "Invizible Overlay",
+    "appId": "com.invizible",
+    "productName": "Invizible",
+    "artifactName": "Invizible-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -59,8 +60,8 @@
       ],
       "category": "public.app-category.productivity",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Invizible Overlay uses the microphone for dictation and live transcription.",
-        "NSScreenCaptureUsageDescription": "Invizible Overlay captures a selected screen or window for OCR."
+        "NSMicrophoneUsageDescription": "Invizible uses the microphone for dictation and live transcription.",
+        "NSScreenCaptureUsageDescription": "Invizible captures a selected screen or window for OCR."
       }
     },
     "win": {
