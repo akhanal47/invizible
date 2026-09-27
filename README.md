@@ -62,7 +62,7 @@ The artifacts are written to `release/` (`.dmg`/`.zip` on macOS; NSIS installer 
 
 - The renderer is sandboxed with `contextIsolation: true` and `nodeIntegration: false`.
 - Renderer privileges are exposed only through the typed bridge in `src/shared/ipc-contract.ts`.
-- API keys never pass back to the renderer; they are encrypted with Electron `safeStorage` and stored separately from `settings.json`.
+- API keys never pass back to the renderer; they are encrypted with Electron `safeStorage` and committed atomically with their endpoints in `settings.json`. Existing separate key files migrate on the next successful settings save.
 - The overlay requests Electron content protection whenever it is created or shown. Capture behavior still needs the manual matrix below; operating systems and capture software can vary.
 
 ## Manual Phase 1 capture gate

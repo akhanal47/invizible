@@ -5,3 +5,5 @@ dist/
 release/
 *.log
 .DS_Store
+node_modules
+pnpm-lock.yaml
