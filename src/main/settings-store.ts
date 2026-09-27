@@ -10,6 +10,8 @@ import {
   validateSettingsUpdate
 } from '../shared/settings';
 
+import { isLocalEndpoint } from '../shared/providers';
+
 const SETTINGS_FILE = 'settings.json';
 const API_KEY_FILE = 'api-key.bin';
 const STT_API_KEY_FILE = 'stt-api-key.bin';
@@ -87,6 +89,7 @@ export class SettingsStore {
 
   getSttApiKey(): string | null {
     if (this.sttApiKey) return this.sttApiKey;
+    if (this.settings.sttProvider === 'deepgram') return null;
     const endpoint = this.settings.sttBaseUrl ?? this.settings.baseUrl;
     return endpoint.replace(/\/+$/, '') === this.settings.baseUrl.replace(/\/+$/, '')
       ? this.apiKey
@@ -105,17 +108,26 @@ export class SettingsStore {
     const errors = validateSettingsUpdate(update);
     if (errors.length > 0) throw new Error(errors.join(' '));
 
-    const { apiKey, sttApiKey, ...nonSensitiveUpdate } = update;
+    const { apiKey: suppliedApiKey, sttApiKey, ...nonSensitiveUpdate } = update;
+    let apiKey = suppliedApiKey;
     const next = { ...this.settings, ...nonSensitiveUpdate };
     if (
       next.baseUrl.replace(/\/+$/, '') !== this.settings.baseUrl.replace(/\/+$/, '') &&
+      isLocalEndpoint(next.baseUrl)
+    )
+      apiKey ??= '';
+    if (
+      next.baseUrl.replace(/\/+$/, '') !== this.settings.baseUrl.replace(/\/+$/, '') &&
+      !isLocalEndpoint(next.baseUrl) &&
       !apiKey?.trim()
     ) {
       throw new Error('Enter an API key for the new endpoint.');
     }
     if (
-      (next.sttBaseUrl ?? next.baseUrl).replace(/\/+$/, '') !==
-        (this.settings.sttBaseUrl ?? this.settings.baseUrl).replace(/\/+$/, '') &&
+      (next.sttProvider !== this.settings.sttProvider ||
+        (next.sttProvider === 'compatible' &&
+          (next.sttBaseUrl ?? next.baseUrl).replace(/\/+$/, '') !==
+            (this.settings.sttBaseUrl ?? this.settings.baseUrl).replace(/\/+$/, ''))) &&
       this.encryptedSttApiKey &&
       sttApiKey === undefined
     ) {

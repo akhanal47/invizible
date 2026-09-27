@@ -190,3 +190,41 @@ describe('provider credentials', () => {
     expect(store.getSttApiKey()).toBeNull();
   });
 });
+
+it('switches to local chat without forwarding a cloud key and persists keyless settings', async () => {
+  const store = await createStore();
+  await store.update({ baseUrl: 'http://localhost:11434/v1', model: 'small-model' });
+  expect(store.getApiKey()).toBeNull();
+  const reloaded = new SettingsStore();
+  await reloaded.load();
+  expect(reloaded.getView().baseUrl).toBe('http://localhost:11434/v1');
+  expect(reloaded.getApiKey()).toBeNull();
+  await expect(reloaded.update({ baseUrl: DEFAULT_SETTINGS.baseUrl })).rejects.toThrow('API key');
+});
+
+it('isolates Deepgram credentials from compatible transcription and chat', async () => {
+  const store = await createStore();
+  await store.update({ sttApiKey: 'compatible-key' });
+  await expect(store.update({ sttProvider: 'deepgram' })).rejects.toThrow('transcription key');
+  await store.update({ sttProvider: 'deepgram', sttApiKey: '' });
+  expect(store.getSttApiKey()).toBeNull();
+  await store.update({ sttApiKey: 'deepgram-key' });
+  await store.update({ baseUrl: 'http://localhost:8080/v1', model: 'local' });
+  expect(store.getSttApiKey()).toBe('deepgram-key');
+  expect(store.getApiKey()).toBeNull();
+  await expect(store.update({ sttProvider: 'compatible' })).rejects.toThrow('transcription key');
+  const reloaded = new SettingsStore();
+  await reloaded.load();
+  expect(reloaded.getSttApiKey()).toBe('deepgram-key');
+  expect(await readFile(join(state.directory, 'settings.json'), 'utf8')).not.toContain(
+    'deepgram-key'
+  );
+});
+
+it('accepts an optional local key but never reuses it for a different local server', async () => {
+  const store = await createStore();
+  await store.update({ baseUrl: 'http://localhost:8080/v1', apiKey: 'local-key' });
+  expect(store.getApiKey()).toBe('local-key');
+  await store.update({ baseUrl: 'http://127.0.0.1:11434/v1' });
+  expect(store.getApiKey()).toBeNull();
+});

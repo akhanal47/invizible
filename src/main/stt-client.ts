@@ -37,7 +37,8 @@ export async function transcribe(
     response = await fetch(endpoint(settings.sttBaseUrl ?? settings.baseUrl), {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
-      body: form
+      body: form,
+      signal: AbortSignal.timeout(60_000)
     });
   } catch (error) {
     throw new SttClientError({

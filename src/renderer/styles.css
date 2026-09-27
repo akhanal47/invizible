@@ -687,3 +687,13 @@ details[open] > summary svg {
   overflow: auto;
   padding: 0 3px 2px;
 }
+
+.live-transcript {
+  margin: 12px 18px 0;
+  max-height: 80px;
+  overflow: auto;
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.6;
+}

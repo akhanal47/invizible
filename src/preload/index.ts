@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC,
   type AssistantApi,
+  type LiveTranscriptionEvent,
   type ChatSendRequest,
   type OverlayMoveRequest,
   type TranscriptionRequest,
@@ -19,8 +20,10 @@ const api: AssistantApi = {
     send: (request: ChatSendRequest) => ipcRenderer.invoke(IPC.chatSend, request),
     abort: (requestId: string) => ipcRenderer.invoke(IPC.chatAbort, requestId),
     test: () => ipcRenderer.invoke(IPC.chatTest),
+    models: (baseUrl, apiKey) => ipcRenderer.invoke(IPC.chatModels, baseUrl, apiKey),
     onStream: (listener: (event: StreamEvent) => void) => {
-      const wrapped = (_event: Electron.IpcRendererEvent, event: StreamEvent): void => listener(event);
+      const wrapped = (_event: Electron.IpcRendererEvent, event: StreamEvent): void =>
+        listener(event);
       ipcRenderer.on(IPC.chatStream, wrapped);
       return () => ipcRenderer.removeListener(IPC.chatStream, wrapped);
     }
@@ -34,14 +37,25 @@ const api: AssistantApi = {
     grabAndOcr: (sourceId: string) => ipcRenderer.invoke(IPC.captureGrabAndOcr, sourceId)
   },
   stt: {
-    transcribe: (request: TranscriptionRequest) => ipcRenderer.invoke(IPC.sttTranscribe, request)
+    transcribe: (request: TranscriptionRequest) => ipcRenderer.invoke(IPC.sttTranscribe, request),
+    start: (sessionId) => ipcRenderer.invoke(IPC.sttStart, sessionId),
+    audio: (sessionId, audio) => ipcRenderer.invoke(IPC.sttAudio, sessionId, audio),
+    stop: (sessionId) => ipcRenderer.invoke(IPC.sttStop, sessionId),
+    cancel: (sessionId) => ipcRenderer.invoke(IPC.sttCancel, sessionId),
+    onStream: (listener) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, event: LiveTranscriptionEvent): void =>
+        listener(event);
+      ipcRenderer.on(IPC.sttStream, wrapped);
+      return () => ipcRenderer.removeListener(IPC.sttStream, wrapped);
+    }
   },
   system: {
     openScreenRecordingSettings: () => ipcRenderer.invoke(IPC.systemOpenScreenRecordingSettings)
   },
   ui: {
     onAction: (listener: (action: UiAction) => void) => {
-      const wrapped = (_event: Electron.IpcRendererEvent, action: UiAction): void => listener(action);
+      const wrapped = (_event: Electron.IpcRendererEvent, action: UiAction): void =>
+        listener(action);
       ipcRenderer.on(IPC.uiAction, wrapped);
       return () => ipcRenderer.removeListener(IPC.uiAction, wrapped);
     }

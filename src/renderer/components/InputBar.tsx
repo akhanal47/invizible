@@ -2,11 +2,15 @@ import { type ChangeEvent, type JSX, type KeyboardEvent } from 'react';
 import { Icon } from './Icon';
 import type { PendingAttachment } from '../../shared/chat-types';
 
+import type { VoicePhase } from '../lib/useVoiceInput';
+
 interface InputBarProps {
   value: string;
   attachments: PendingAttachment[];
   isStreaming: boolean;
-  isRecording: boolean;
+  voicePhase: VoicePhase;
+  interimTranscript: string;
+  liveVoice: boolean;
   onChange(value: string): void;
   onSend(): void;
   onAbort(): void;
@@ -16,10 +20,22 @@ interface InputBarProps {
 }
 
 export function InputBar(props: InputBarProps): JSX.Element {
+  const isRecording = props.voicePhase === 'listening';
+  const voiceBusy = props.voicePhase !== 'idle';
+  const micLabel =
+    props.voicePhase === 'connecting'
+      ? 'Cancel'
+      : props.voicePhase === 'finishing'
+        ? 'Finishing…'
+        : isRecording
+          ? 'Stop'
+          : props.liveVoice
+            ? 'Live dictate'
+            : 'Dictate';
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
-      props.onSend();
+      if (!voiceBusy) props.onSend();
     }
   }
   return (
@@ -43,6 +59,12 @@ export function InputBar(props: InputBarProps): JSX.Element {
           ))}
         </div>
       )}
+      {props.interimTranscript && (
+        <div className="live-transcript" aria-label="Tentative transcript">
+          {props.interimTranscript}
+          <span> …</span>
+        </div>
+      )}
       <textarea
         aria-label="Message"
         placeholder="Ask anything, or add some context…"
@@ -63,14 +85,15 @@ export function InputBar(props: InputBarProps): JSX.Element {
             <span>Capture</span>
           </button>
           <button
-            className={`tool-button ${props.isRecording ? 'recording' : ''}`}
-            aria-label={props.isRecording ? 'Stop recording' : 'Record a voice note'}
-            aria-pressed={props.isRecording}
-            title={props.isRecording ? 'Stop recording' : 'Record a voice note'}
+            className={`tool-button ${isRecording ? 'recording' : ''}`}
+            aria-label={micLabel}
+            aria-pressed={isRecording}
+            title={micLabel}
+            disabled={props.voicePhase === 'finishing'}
             onClick={props.onMic}
           >
-            <Icon name={props.isRecording ? 'stop' : 'mic'} />
-            <span>{props.isRecording ? 'Recording' : 'Dictate'}</span>
+            <Icon name={isRecording ? 'stop' : 'mic'} />
+            <span>{micLabel}</span>
           </button>
         </div>
         {props.isStreaming ? (
@@ -88,7 +111,7 @@ export function InputBar(props: InputBarProps): JSX.Element {
             aria-label="Send message"
             title="Send message (Enter)"
             onClick={props.onSend}
-            disabled={!props.value.trim() && props.attachments.length === 0}
+            disabled={voiceBusy || (!props.value.trim() && props.attachments.length === 0)}
           >
             <Icon name="send" />
           </button>

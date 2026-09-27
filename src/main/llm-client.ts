@@ -1,3 +1,4 @@
+import { isLocalEndpoint } from '../shared/providers';
 import type { ChatError, ChatMessage } from '../shared/chat-types';
 import type { Settings } from '../shared/settings';
 
@@ -53,7 +54,10 @@ async function createResponse(
   try {
     return await fetch(endpoint(settings.baseUrl, '/chat/completions'), {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(body),
       signal
     });
@@ -62,7 +66,11 @@ async function createResponse(
       throw new LlmClientError({ kind: 'aborted', message: 'Generation stopped.' });
     throw new LlmClientError({
       kind: 'network',
-      message: error instanceof Error ? error.message : 'Network request failed.'
+      message: isLocalEndpoint(settings.baseUrl)
+        ? 'Cannot reach the local model server. Start Ollama or llama-server and check the endpoint in Settings.'
+        : error instanceof Error
+          ? error.message
+          : 'Network request failed.'
     });
   }
 }
@@ -143,4 +151,24 @@ export async function testConnection(settings: Settings, apiKey: string): Promis
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function listModels(baseUrl: string, apiKey: string): Promise<string[]> {
+  const url = new URL(baseUrl);
+  if (!['http:', 'https:'].includes(url.protocol))
+    throw new Error('Use an HTTP or HTTPS endpoint.');
+  const response = await fetch(endpoint(baseUrl, '/models'), {
+    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+    signal: AbortSignal.timeout(10_000)
+  });
+  if (!response.ok) throw toError(response, await response.text());
+  const body = (await response.json()) as { data?: Array<{ id?: unknown }> };
+  if (!Array.isArray(body.data)) throw new Error('This server did not return a model list.');
+  return [
+    ...new Set(
+      body.data
+        .map((item) => item.id)
+        .filter((id): id is string => typeof id === 'string' && !!id.trim())
+    )
+  ];
 }

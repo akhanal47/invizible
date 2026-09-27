@@ -25,12 +25,24 @@ export function assembleMessages(
   ]
     .filter(Boolean)
     .join('\n\n');
-  const userContent = [renderedBasePrompt || fallbackContext, userText.trim()].filter(Boolean).join('\n\n');
-  const system = settings.systemPrompt.trim() ? [{ role: 'system' as const, content: settings.systemPrompt.trim() }] : [];
+  const userContent = [renderedBasePrompt || fallbackContext, userText.trim()]
+    .filter(Boolean)
+    .join('\n\n');
+  const system = settings.systemPrompt.trim()
+    ? [{ role: 'system' as const, content: settings.systemPrompt.trim() }]
+    : [];
   const retained = [...history];
   const finalUser = { role: 'user' as const, content: userContent };
-  while (retained.length > 0 && estimateTokens([...system, ...retained, finalUser]) > settings.contextBudgetTokens) {
+  while (
+    retained.length > 0 &&
+    estimateTokens([...system, ...retained, finalUser]) > settings.contextBudgetTokens
+  ) {
     retained.shift();
   }
   return [...system, ...retained, finalUser];
+}
+
+// Conservative approximation for enforcing the configured history budget.
+function estimateTokens(messages: ChatMessage[]): number {
+  return messages.reduce((total, message) => total + Math.ceil(message.content.length / 4) + 4, 0);
 }
