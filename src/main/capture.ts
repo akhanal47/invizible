@@ -6,7 +6,7 @@ const FULL_SIZE = { width: 4096, height: 4096 };
 
 function screenRecordingError(): Error {
   return new Error(
-    'Screen Recording permission is required to capture text. Open System Settings → Privacy & Security → Screen Recording, enable Invisible AI Overlay, then quit and reopen the app.'
+    'Screen Recording permission is required to capture text. Open System Settings → Privacy & Security → Screen Recording, enable Invizible, then quit and reopen the app.'
   );
 }
 
@@ -29,7 +29,7 @@ async function getSources(thumbnailSize: { width: number; height: number }) {
 export async function listSources(): Promise<CaptureSource[]> {
   const sources = await getSources(THUMBNAIL_SIZE);
   return sources
-    .filter((source) => source.name !== 'Invisible AI Overlay')
+    .filter((source) => source.name !== 'Invizible')
     .map((source) => ({
       id: source.id,
       name: source.name || 'Untitled window',

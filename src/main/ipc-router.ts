@@ -1,6 +1,10 @@
 import { ipcMain, shell } from 'electron';
 import { IPC } from '../shared/ipc-contract';
-import type { ChatSendRequest, OverlayMoveRequest, TranscriptionRequest } from '../shared/ipc-contract';
+import type {
+  ChatSendRequest,
+  OverlayMoveRequest,
+  TranscriptionRequest
+} from '../shared/ipc-contract';
 import type { ChatError } from '../shared/chat-types';
 import type { SettingsUpdate } from '../shared/settings';
 import { grabSource, listSources } from './capture';
@@ -24,7 +28,9 @@ export function registerIpcHandlers(settingsStore: SettingsStore): void {
   });
   ipcMain.handle(IPC.overlayClose, closeOverlay);
   ipcMain.handle(IPC.systemOpenScreenRecordingSettings, () =>
-    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+    shell.openExternal(
+      'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
+    )
   );
   ipcMain.handle(IPC.captureListSources, listSources);
   ipcMain.handle(IPC.captureGrabAndOcr, async (_event, sourceId: string) => {
@@ -38,7 +44,9 @@ export function registerIpcHandlers(settingsStore: SettingsStore): void {
     };
   });
   ipcMain.handle(IPC.sttTranscribe, async (_event, request: TranscriptionRequest) => {
-    return transcribe(settingsStore.getView(), apiKey(), request.audio, request.mimeType);
+    const key = settingsStore.getSttApiKey();
+    if (!key) throw new Error('Add a transcription API key in Settings → Voice input.');
+    return transcribe(settingsStore.getView(), key, request.audio, request.mimeType);
   });
   ipcMain.handle(IPC.chatTest, async () => testConnection(settingsStore.getView(), apiKey()));
   ipcMain.handle(IPC.chatAbort, (_event, requestId: string) => requests.get(requestId)?.abort());
@@ -47,7 +55,12 @@ export function registerIpcHandlers(settingsStore: SettingsStore): void {
     const controller = new AbortController();
     requests.set(request.requestId, controller);
     try {
-      for await (const streamEvent of streamChat(settingsStore.getView(), apiKey(), request.messages, controller.signal)) {
+      for await (const streamEvent of streamChat(
+        settingsStore.getView(),
+        apiKey(),
+        request.messages,
+        controller.signal
+      )) {
         event.sender.send(IPC.chatStream, { requestId: request.requestId, ...streamEvent });
       }
     } catch (error) {
@@ -56,8 +69,15 @@ export function registerIpcHandlers(settingsStore: SettingsStore): void {
           ? error.detail
           : error instanceof SttClientError
             ? error.detail
-            : { kind: 'unknown', message: error instanceof Error ? error.message : 'Chat request failed.' };
-      event.sender.send(IPC.chatStream, { requestId: request.requestId, type: 'error', error: detail });
+            : {
+                kind: 'unknown',
+                message: error instanceof Error ? error.message : 'Chat request failed.'
+              };
+      event.sender.send(IPC.chatStream, {
+        requestId: request.requestId,
+        type: 'error',
+        error: detail
+      });
     } finally {
       requests.delete(request.requestId);
     }

@@ -13,7 +13,7 @@ export class LlmClientError extends Error {
 }
 
 function endpoint(baseUrl: string, path: string): string {
-  return `${baseUrl.replace(/\/$/, '')}${path}`;
+  return `${baseUrl.replace(/\/+$/, '')}${path}`;
 }
 
 function toError(response: Response, message: string): LlmClientError {
@@ -25,7 +25,11 @@ function toError(response: Response, message: string): LlmClientError {
         : response.status >= 400 && response.status < 500
           ? 'bad_request'
           : 'unknown';
-  return new LlmClientError({ kind, message: message || `Request failed (${response.status}).`, status: response.status });
+  return new LlmClientError({
+    kind,
+    message: message || `Request failed (${response.status}).`,
+    status: response.status
+  });
 }
 
 async function createResponse(
@@ -39,9 +43,13 @@ async function createResponse(
     model: settings.model,
     messages,
     stream: true,
-    max_tokens: settings.maxOutputTokens
+    // Newer OpenAI reasoning models reject the legacy max_tokens field.
+    [/^(gpt-[5-9](?:[.-]|$)|o[1-9](?:-|$))/.test(settings.model)
+      ? 'max_completion_tokens'
+      : 'max_tokens']: settings.maxOutputTokens
   };
-  if (includeReasoningEffort && settings.reasoningEffort !== 'none') body.reasoning_effort = settings.reasoningEffort;
+  if (includeReasoningEffort && settings.reasoningEffort !== 'none')
+    body.reasoning_effort = settings.reasoningEffort;
   try {
     return await fetch(endpoint(settings.baseUrl, '/chat/completions'), {
       method: 'POST',
@@ -50,8 +58,12 @@ async function createResponse(
       signal
     });
   } catch (error) {
-    if (signal.aborted) throw new LlmClientError({ kind: 'aborted', message: 'Generation stopped.' });
-    throw new LlmClientError({ kind: 'network', message: error instanceof Error ? error.message : 'Network request failed.' });
+    if (signal.aborted)
+      throw new LlmClientError({ kind: 'aborted', message: 'Generation stopped.' });
+    throw new LlmClientError({
+      kind: 'network',
+      message: error instanceof Error ? error.message : 'Network request failed.'
+    });
   }
 }
 
@@ -64,13 +76,27 @@ export async function* streamChat(
   let response = await createResponse(settings, apiKey, messages, signal, true);
   if (!response.ok) {
     const responseText = await response.text();
-    if (response.status === 400 && settings.reasoningEffort !== 'none' && /reasoning_effort/i.test(responseText)) {
+    if (
+      response.status === 400 &&
+      settings.reasoningEffort !== 'none' &&
+      /reasoning_effort/i.test(responseText)
+    ) {
       response = await createResponse(settings, apiKey, messages, signal, false);
-      if (response.ok) yield { type: 'notice', text: 'This provider does not support reasoning effort; retried without it.' };
+      if (response.ok)
+        yield {
+          type: 'notice',
+          text: 'This provider does not support reasoning effort; retried without it.'
+        };
+    } else {
+      throw toError(response, responseText);
     }
   }
   if (!response.ok) throw toError(response, await response.text());
-  if (!response.body) throw new LlmClientError({ kind: 'network', message: 'The server returned no response stream.' });
+  if (!response.body)
+    throw new LlmClientError({
+      kind: 'network',
+      message: 'The server returned no response stream.'
+    });
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -86,7 +112,9 @@ export async function* streamChat(
       const data = line.slice(5).trim();
       if (!data || data === '[DONE]') continue;
       try {
-        const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }> };
+        const parsed = JSON.parse(data) as {
+          choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
+        };
         const choice = parsed.choices?.[0];
         if (choice?.delta?.content) yield { type: 'delta', text: choice.delta.content };
         if (choice?.finish_reason) finishReason = choice.finish_reason;
@@ -103,8 +131,15 @@ export async function testConnection(settings: Settings, apiKey: string): Promis
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
   try {
-    const response = await createResponse(settings, apiKey, [{ role: 'user', content: 'Reply with OK.' }], controller.signal, false);
+    const response = await createResponse(
+      settings,
+      apiKey,
+      [{ role: 'user', content: 'Reply with OK.' }],
+      controller.signal,
+      false
+    );
     if (!response.ok) throw toError(response, await response.text());
+    await response.body?.cancel();
   } finally {
     clearTimeout(timer);
   }

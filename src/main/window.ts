@@ -8,17 +8,19 @@ export function createOverlayWindow(): BrowserWindow {
   const display = screen.getPrimaryDisplay();
   const { width, height } = display.workAreaSize;
   overlayWindow = new BrowserWindow({
-    title: 'Invisible AI Overlay',
+    title: 'Invizible',
     width: 560,
     height: 680,
     x: Math.round((width - 560) / 2),
     y: Math.round((height - 680) / 2),
     frame: false,
     resizable: true,
+    minWidth: 380,
+    minHeight: 480,
     alwaysOnTop: true,
     skipTaskbar: true,
     show: false,
-    backgroundColor: '#111827',
+    backgroundColor: '#151719',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -81,7 +83,8 @@ export function nudge(direction: 'up' | 'down' | 'left' | 'right', pixels = 40):
 }
 
 export function getWindow(): BrowserWindow {
-  if (!overlayWindow || overlayWindow.isDestroyed()) throw new Error('Overlay window is unavailable.');
+  if (!overlayWindow || overlayWindow.isDestroyed())
+    throw new Error('Overlay window is unavailable.');
   return overlayWindow;
 }
 
