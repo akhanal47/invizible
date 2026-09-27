@@ -1,8 +1,8 @@
 {
-  "name": "invisible-ai-overlay",
+  "name": "Invizible",
   "version": "0.1.0",
   "private": true,
-  "description": "A protected desktop AI overlay.",
+  "description": "A desktop overlay.",
   "packageManager": "pnpm@11.19.0",
   "main": "./out/main/index.js",
   "scripts": {
@@ -41,16 +41,16 @@
     "vitest": "4.1.10"
   },
   "build": {
-    "appId": "com.invisibleai.overlay",
-    "productName": "Invisible AI Overlay",
+    "appId": "com.invizible.overlay",
+    "productName": "Invizible Overlay",
     "directories": { "output": "release" },
     "files": ["out/**/*", "package.json"],
     "mac": {
       "target": ["dmg", "zip"],
       "category": "public.app-category.productivity",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Invisible AI Overlay uses the microphone for push-to-talk transcription.",
-        "NSScreenCaptureUsageDescription": "Invisible AI Overlay captures a selected screen or window for OCR."
+        "NSMicrophoneUsageDescription": "Invizible Overlay uses the microphone for push-to-talk transcription.",
+        "NSScreenCaptureUsageDescription": "Invizible Overlay captures a selected screen or window for OCR."
       }
     },
     "win": { "target": ["nsis"] }

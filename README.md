@@ -1,6 +1,6 @@
-# Invisible AI Overlay Assistant
+# Overlay Assistant
 
-Cross-platform Electron overlay for a private, user-controlled AI chat workflow. It streams to OpenAI-compatible `/chat/completions` APIs, can OCR a selected screen/window, and supports push-to-talk transcription via an OpenAI-compatible transcription endpoint.
+Cross-platform Electron overlay for a private, user-controlled chat workflow. It streams to OpenAI-compatible `/chat/completions` APIs, can OCR a selected screen/window, and supports push-to-talk transcription via an OpenAI-compatible (others to be added soon) transcription endpoint.
 
 ## Prerequisites
 
@@ -15,12 +15,28 @@ Use `pnpm run build`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm test` to 
 
 ## Use
 
-1. Open **Settings** and enter an API base URL, model, and API key. The key is write-only and encrypted by Electron safeStorage.
+1. Open **Settings**, choose OpenAI, Claude, Gemini, or a custom endpoint, and enter your provider API key. Presets fill in the endpoint and suggest current models; you can also type a model ID. Keys are write-only and encrypted by Electron safeStorage. **Save & test** saves the form and checks that connection.
 2. Type a message and press `Enter` to send it. Use `Shift+Enter` for a newline. The model response streams into the chat; `Esc` or **Stop** aborts it.
 3. Select **Capture** (or press the capture hotkey), choose a display/window, and wait for the OCR attachment chip. Remove a chip with its × button if needed.
-4. Select **Mic** (or press its hotkey) to start recording; use it again to stop. The transcript is placed in the input field and is never sent until you press `Enter`.
+4. Select **Dictate** (or press its hotkey) to start recording; use it again to stop. Recorded audio is sent to the configured transcription provider when you stop. The transcript is placed in the input field for review before you send it to chat.
 
-The app never automatically sends typed text, OCR, or transcription.
+Typed messages, extracted screen text, and finished transcripts are sent to chat only when you press Send or Enter.
+
+### Model providers
+
+All chat providers use streaming OpenAI-format `/chat/completions` requests:
+
+| Provider | Base URL                                                  | Default preset     |
+| -------- | --------------------------------------------------------- | ------------------ |
+| OpenAI   | `https://api.openai.com/v1`                               | `gpt-6-luna`       |
+| Claude   | `https://api.anthropic.com/v1`                            | `claude-sonnet-5`  |
+| Gemini   | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-3.8-flash` |
+
+Existing saved models and endpoints are preserved. Modern OpenAI models use `max_completion_tokens`; Claude, Gemini, and older/custom models use `max_tokens`. The reasoning setting defaults to the provider's own behavior.
+
+Under **Voice input**, configure a separate OpenAI-compatible transcription URL, model, and key when using Claude or Gemini for chat. A separate endpoint requires its own key. With OpenAI, leaving the transcription endpoint and key blank uses the chat connection.
+
+Model and endpoint references: [OpenAI model guidance](https://developers.openai.com/api/docs/guides/latest-model), [Claude models](https://platform.claude.com/docs/en/models/overview), [Claude OpenAI compatibility](https://platform.claude.com/docs/en/cli-sdks-libraries/libraries/openai-sdk), [Gemini OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai).
 
 ### Fixed hotkeys
 
@@ -40,7 +56,7 @@ Create unsigned development artifacts with:
 pnpm package
 ```
 
-Artifacts are written to `release/` (`.dmg`/`.zip` on macOS; NSIS installer when packaged on Windows). Production distribution still requires your signing and notarization credentials.
+The artifacts are written to `release/` (`.dmg`/`.zip` on macOS; NSIS installer when packaged on Windows). If you want a prod distribution, they require your signing and notarization credentials.
 
 ## Security model
 
@@ -59,3 +75,18 @@ Before relying on the overlay in an interview, test Windows 10 2004+ and macOS 1
 4. Record any OS, client, GPU driver, or capture-method exceptions before proceeding to chat, OCR, or microphone features.
 
 Content protection is a best-effort OS feature, not a guarantee against every capture path.
+
+## Disclaimer
+
+This is provided "as is", without warranty of any kind, express or implied,
+including but not limited to the warranties of merchantability, fitness for a
+particular purpose, and noninfringement.
+
+The user assumes full responsibility for any use of this code. In no event shall
+the author(s) or contributors be liable for any claim, damages, data loss, or other
+liability, whether in an action of contract, tort, or otherwise, arising from, out of,
+or in connection with the code or its use.
+
+This project is intended for educational purposes only. Users are solely
+responsible for ensuring their use complies with any and all applicable laws, regulations,
+and third-party terms of service.

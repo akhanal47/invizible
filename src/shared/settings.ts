@@ -15,17 +15,19 @@ export interface Settings {
 
 export interface SettingsView extends Settings {
   hasApiKey: boolean;
+  hasSttApiKey: boolean;
 }
 
 export interface SettingsUpdate extends Partial<Settings> {
   /** Write-only: omitted leaves it unchanged, an empty string clears it. */
   apiKey?: string;
+  sttApiKey?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   baseUrl: 'https://api.openai.com/v1',
   sttBaseUrl: null,
-  model: 'gpt-4o-mini',
+  model: 'gpt-6-luna',
   sttModel: 'whisper-1',
   reasoningEffort: 'none',
   maxOutputTokens: 1_000,
@@ -46,24 +48,25 @@ export function validateSettingsUpdate(update: SettingsUpdate): string[] {
   if (update.baseUrl !== undefined) {
     try {
       const url = new URL(update.baseUrl);
-      if (!['http:', 'https:'].includes(url.protocol)) errors.push('Base URL must use HTTP or HTTPS.');
+      if (!['http:', 'https:'].includes(url.protocol))
+        errors.push('Base URL must use HTTP or HTTPS.');
     } catch {
       errors.push('Base URL must be a valid URL.');
     }
   }
   if (update.sttBaseUrl !== undefined && update.sttBaseUrl !== null) {
     try {
-      new URL(update.sttBaseUrl);
+      const url = new URL(update.sttBaseUrl);
+      if (!['http:', 'https:'].includes(url.protocol))
+        errors.push('STT base URL must use HTTP or HTTPS.');
     } catch {
       errors.push('STT base URL must be a valid URL.');
     }
   }
   if (update.model !== undefined && update.model.trim() === '') errors.push('Model is required.');
-  if (update.sttModel !== undefined && update.sttModel.trim() === '') errors.push('STT model is required.');
-  if (
-    update.reasoningEffort !== undefined &&
-    !reasoningEfforts.includes(update.reasoningEffort)
-  ) {
+  if (update.sttModel !== undefined && update.sttModel.trim() === '')
+    errors.push('STT model is required.');
+  if (update.reasoningEffort !== undefined && !reasoningEfforts.includes(update.reasoningEffort)) {
     errors.push('Reasoning effort is invalid.');
   }
   if (update.maxOutputTokens !== undefined && !isPositiveInteger(update.maxOutputTokens)) {

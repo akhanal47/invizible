@@ -3,7 +3,9 @@ import { validateSettingsUpdate } from './settings';
 
 describe('validateSettingsUpdate', () => {
   it('accepts valid partial updates', () => {
-    expect(validateSettingsUpdate({ baseUrl: 'https://example.com/v1', maxOutputTokens: 16 })).toEqual([]);
+    expect(
+      validateSettingsUpdate({ baseUrl: 'https://example.com/v1', maxOutputTokens: 16 })
+    ).toEqual([]);
   });
 
   it('rejects invalid values', () => {
@@ -12,4 +14,10 @@ describe('validateSettingsUpdate', () => {
       'Context budget must be a positive integer.'
     ]);
   });
+});
+
+it('rejects non-HTTP transcription endpoints', () => {
+  expect(validateSettingsUpdate({ sttBaseUrl: 'file:///tmp/audio' })).toContain(
+    'STT base URL must use HTTP or HTTPS.'
+  );
 });

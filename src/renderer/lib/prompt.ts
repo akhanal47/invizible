@@ -1,10 +1,6 @@
 import type { ChatMessage, PendingAttachment } from '../../shared/chat-types';
 import type { Settings } from '../../shared/settings';
 
-export function estimateTokens(messages: ChatMessage[]): number {
-  return Math.ceil(messages.reduce((total, message) => total + message.content.length, 0) / 4);
-}
-
 export function assembleMessages(
   settings: Settings,
   history: ChatMessage[],
